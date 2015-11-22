@@ -88,16 +88,19 @@ def updated() {
     if (realgdstate != virtualgdstate) {
         if (realgdstate == "open") {
             log.debug "opening virtual door"
-            mysend("Virtual Garage Door Opened!")     
+            mysend("91 Virtual Garage Door Opened!")     
             virtualgd.open()
         } else {
             virtualgd.close()
             log.debug "closing virtual door"
-            mysend("Virtual Garage Door Closed!")   
+            mysend("96 Virtual Garage Door Closed!")   
         }
     }
 }
 
+/**
+*  Garage door sensor state changed, sync to the virtual garage door state
+*/
 def contactHandler(evt) {
     def virtualgdstate = virtualgd.currentContact
     // how to determine which contact
@@ -108,7 +111,7 @@ def contactHandler(evt) {
         log.debug "Contact is in ${evt.value} state"
         // reset virtual door if necessary
         if (virtualgdstate != "open") {
-            mysend("Garage Door Opened Manually syncing with Virtual Garage Door!")   
+            mysend("114 Garage Door Opened Manually syncing with Virtual Garage Door!")   
             virtualgd.open()
         }
     }  
@@ -117,35 +120,36 @@ def contactHandler(evt) {
         log.debug "Contact is in ${evt.value} state"
         //reset virtual door
         if (virtualgdstate != "closed") {
-            mysend("Garage Door Closed Manually syncing with Virtual Garage Door!")   
+            mysend("123 Garage Door Closed Manually syncing with Virtual Garage Door!")   
             virtualgd.close()
         } 
     }
 }
 
+/**
+*  Virtual Garage Door Switch changed, open/close the actual garage door if state doesn't match
+*  Also sets a timeout to verify that the open/close actually happened
+*/
 def virtualgdcontactHandler(evt) {
     // how to determine which contact
     def realgdstate = sensor.currentContact
     //log.debug "in virtual gd contact/button handler event = $evt"
     //log.debug "in virtualgd contact handler check timeout = $checkTimeout"
 
-    if("open" == evt.value) {
-        // contact was opened, turn on a light maybe?
+    if ("open" == evt.value) {
         log.debug "Contact is in ${evt.value} state"
-        // check to see if door is not in open state if so open
         if (realgdstate != "open") {
             log.debug "opening real gd to correspond with button press"
-            mysend("Virtual Garage Door Opened syncing with Actual Garage Door!")   
+            mysend("143 Virtual Garage Door Opened syncing with Actual Garage Door!")   
             opener.on()
             runIn(checkTimeout, checkIfActuallyOpened)
         }
     }
-    if("closed" == evt.value) {
-        // contact was closed, turn off the light?
+    if ("closed" == evt.value) {
         log.debug "Contact is in ${evt.value} state"
         if (realgdstate != "closed") {
             log.debug "closing real gd to correspond with button press"
-            mysend("Virtual Garage Door Closed syncing with Actual Garage Door!")   
+            mysend("152 Virtual Garage Door Closed syncing with Actual Garage Door!")   
             opener.on()
             runIn(checkTimeout, checkIfActuallyClosed)
         }
@@ -171,7 +175,9 @@ private mysend(msg) {
     log.debug msg
 }
 
-
+/**
+*  Called after the virtual switch is closed to verify that the actual garage has closed and tries a second time
+*/
 def checkIfActuallyClosed() { 
     def realgdstate = sensor.currentContact
     def virtualgdstate = virtualgd.currentContact
@@ -199,7 +205,7 @@ def checkIfActuallyOpened() {
     // sync them up if need be set virtual same as actual
     if (realgdstate == "closed" && virtualgdstate == "open") {
         log.debug "opening virtual door as it didnt open.. track blocked?"
-        mysend("Resetting Virtual Garage Door to Closed as real door didn't open! (track blocked?)")   
+        mysend("208 Resetting Virtual Garage Door to Closed as real door didn't open! (track blocked?)")
         virtualgd.close()
     }   
 }
