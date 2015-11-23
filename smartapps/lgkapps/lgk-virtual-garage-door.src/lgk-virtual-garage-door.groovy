@@ -13,6 +13,11 @@
 *  Author: LGKahn kahn-st@lgk.com
 *  version 2 user defineable timeout before checking if door opened or closed correctly. Raised default to 25 secs. can reduce to 15 if you have custom simulated door with < 6 sec wait.
 * https://github.com/SmartThingsCommunity/SmartThingsPublic/blob/746b9a6a38b69aa472296fc57fb6227b28c7c0bd/smartapps/lgkapps/lgk-virtual-garage-door.src/lgk-virtual-garage-door.groovy
+*
+*  Author: kerbs17
+*  Changes:
+*      * removed some of the push notifications
+*      * added an open threshold to receive a notification when the garage has been open for x minutes
 */
 
 definition(
@@ -31,6 +36,7 @@ preferences {
     }
     section("Choose the sensor that senses if the garage is open closed? "){
         input "sensor", "capability.contactSensor", title: "Physical Garage Door Open/Closed?", required: true
+        input "openThreshold", "number", title: "Warn when open longer than (optional)",description: "Number of minutes", required: false
     }
     
     section("Choose the Virtual Garage Door Device? "){
@@ -111,18 +117,43 @@ def contactHandler(evt) {
         log.debug "Contact is in ${evt.value} state"
         // reset virtual door if necessary
         if (virtualgdstate != "open") {
-            mysend("114 Garage Door Opened Manually syncing with Virtual Garage Door!")   
+            //mysend("114 Garage Door Opened Manually syncing with Virtual Garage Door!")   
             virtualgd.open()
         }
-    }  
-    if("closed" == evt.value) {
+        schedule("0 * * * * ?", "doorOpenCheck")
+    } else if("closed" == evt.value) {
         // contact was closed, turn off the light?
         log.debug "Contact is in ${evt.value} state"
         //reset virtual door
         if (virtualgdstate != "closed") {
-            mysend("123 Garage Door Closed Manually syncing with Virtual Garage Door!")   
+            //mysend("123 Garage Door Closed Manually syncing with Virtual Garage Door!")   
             virtualgd.close()
-        } 
+        }
+        if (state.openDoorNotificationSent) {
+            mysend("Garage door is now closed")
+            state.openDoorNotificationSent = false
+        }
+        unschedule("doorOpenCheck")
+    }
+}
+
+def doorOpenCheck() {
+    final thresholdMinutes = openThreshold
+    if (thresholdMinutes) {
+        def currentState = sensor.contactState
+        log.debug "doorOpenCheck"
+        if (currentState?.value == "open") {
+            log.debug "open for ${now() - currentState.date.time}, openDoorNotificationSent: ${state.openDoorNotificationSent}"
+            if (!state.openDoorNotificationSent && now() - currentState.date.time > thresholdMinutes * 60 * 1000) {
+                def msg = "Garage has been open for ${thresholdMinutes} minutes"
+                log.info msg
+
+                mysend(msg)
+                state.openDoorNotificationSent = true
+            }
+        } else {
+            state.openDoorNotificationSent = false
+        }
     }
 }
 
@@ -144,8 +175,7 @@ def virtualgdcontactHandler(evt) {
             opener.on()
             runIn(checkTimeout, checkIfActuallyOpened)
         }
-    }
-    if ("closed" == evt.value) {
+    }else if ("closed" == evt.value) {
         log.debug "Contact is in ${evt.value} state"
         if (realgdstate != "closed") {
             log.debug "closing real gd to correspond with button press"
